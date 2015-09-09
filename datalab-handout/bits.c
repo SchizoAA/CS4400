@@ -151,9 +151,9 @@ int bitAnd(int x, int y) {
  *   Rating: 2
  */
 int getByte(int x, int n) {
-	n = n << 1;
+	n = n << 3;
 	int r1 = x >> n;
-	r1 = r1 & 0x00000011
+	r1 = r1 & 0xff
 	return r1;
 }
 /* 
@@ -166,7 +166,7 @@ int getByte(int x, int n) {
  */
 int logicalShift(int x, int n) {
 	x = x >> n;
-	int mask = ~(((0x1 << 31) >> n) << 1);
+	int mask = ((1 << (32 + (~n+1))) + ~0);
 	return x & mask;
 }
 /*
@@ -178,14 +178,24 @@ int logicalShift(int x, int n) {
  */
 int bitCount(int x) {
 	//Hamming weight algorithm
-	int first = 0x55555555;
-	int second = 0x33333333;
-	int third = 0x0f0f0f0f;
-	int fourth = 0x0000ffff;
+	int first = 0x55;
+	first = (first << 8) | first;
+	first = (first << 16) | first;//creates 0x55555555
+	int second = 0x33;
+	second = (second << 8) | second;
+	second = (second << 16) | second;//creates 0x33333333
+	int third = 0x0f;
+	third = (third << 8) | third;
+	third = (third << 16) | third;//creates 0x0f0f0f0f
+	int fourth = 0xff;
+	fourth = (fourth << 16) | fourth;//creates 0x00ff00ff
+	int fifth = 0xff;
+	fifth = (fifth << 8) | fifth;//creates 0x0000ffff
 	x = (x & first) + ((x >> 1) & first);
 	x = (x & second) + ((x >> 2) & second);
 	x = (x & third) + ((x >> 4) & third);
 	x = (x & fourth) + ((x >> 8) & fourth);
+	x = (x & fifth) + ((x >> 16) & fifth);
 	return x;
 }
 /* 
@@ -207,7 +217,7 @@ int bang(int x) {
  *   Rating: 1
  */
 int tmin(void) {
-	return 0x80000000;
+	return 1 << 31;
 }
 /* 
  * fitsBits - return 1 if x can be represented as an 
@@ -220,8 +230,8 @@ int tmin(void) {
  */
 int fitsBits(int x, int n) {
 	int m = x >> 31;
-	int r1 = (~x & m)+(x & m);
-  return r1 >> (n + ~0);
+	int r1 = (~x & m)+(x & ~m);//get highest bit
+  return !(r1 >> (n + ~0));//see if it fits in n bits.
 }
 /* 
  * divpwr2 - Compute x/(2^n), for 0 <= n <= 30
@@ -232,8 +242,9 @@ int fitsBits(int x, int n) {
  *   Rating: 2
  */
 int divpwr2(int x, int n) {
-	x >> n
-    return 2;
+	/*Mask bits, round, and divide*/
+	int mask = (1 << n) + ~0;
+    return (x + ((x >> 31) & mask)) >> n;
 }
 /* 
  * negate - return -x 
@@ -243,7 +254,8 @@ int divpwr2(int x, int n) {
  *   Rating: 2
  */
 int negate(int x) {
-  return ~x+1;
+	/*Invert x and add 1*/
+  return ~x + 1;
 }
 /* 
  * isPositive - return 1 if x > 0, return 0 otherwise 
@@ -253,7 +265,11 @@ int negate(int x) {
  *   Rating: 3
  */
 int isPositive(int x) {
-  return 2;
+	/*Mask highest bit and check if it is negative or number = 0*/
+	int mask = 1 << 31;
+	int res = !(x & mask);
+	int zero = !x;
+  return res ^ zero;
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -263,7 +279,13 @@ int isPositive(int x) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return 2;
+	int signs = x ^ y;//check if signs are same
+	int diff = y + (~x+1);//y-x
+	result = ~signs & ~diff; //Check difference
+	signs = signs & x; //is x negative?
+	result = result & signs; //Check sign of x
+	result = result & (1 << 31); //is difference negative?
+	return (!!result) & (!(!diff));
 }
 /*
  * ilog2 - return floor(log base 2 of x), where x > 0
@@ -273,7 +295,34 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4
  */
 int ilog2(int x) {
-  return 2;
+	/*Fill all bits below highest 1*/
+	x = x | (x >> 1);
+	x = x | (x >> 2);
+	x = x | (x >> 4);
+	x = x | (x >> 8);
+	x = x | (x >> 16);
+	
+	/*Hamming weight algorithm counts number of 1 bits*/
+	int first = 0x55;
+	first = (first << 8) | first;
+	first = (first << 16) | first;//creates 0x55555555
+	int second = 0x33;
+	second = (second << 8) | second;
+	second = (second << 16) | second;//creates 0x33333333
+	int third = 0x0f;
+	third = (third << 8) | third;
+	third = (third << 16) | third;//creates 0x0f0f0f0f
+	int fourth = 0xff;
+	fourth = (fourth << 16) | fourth;//creates 0x00ff00ff
+	int fifth = 0xff;
+	fifth = (fifth << 8) | fifth;//creates 0x0000ffff
+	
+	x = (x & first) + ((x >> 1) & first);
+	x = (x & second) + ((x >> 2) & second);
+	x = (x & third) + ((x >> 4) & third);
+	x = (x & fourth) + ((x >> 8) & fourth);
+	x = (x & fifth) + ((x >> 16) & fifth);
+  return x + ~0;//subtract 1 from result for floor
 }
 /* 
  * float_neg - Return bit-level equivalent of expression -f for
@@ -287,7 +336,11 @@ int ilog2(int x) {
  *   Rating: 2
  */
 unsigned float_neg(unsigned uf) {
- return 2;
+	/*Check if argument is NaN*/
+	if((uf << 1) > 0xff000000){
+		return uf;
+	}
+	return (uf ^ (1 << 31));
 }
 /* 
  * float_i2f - Return bit-level equivalent of expression (float) x
@@ -299,7 +352,28 @@ unsigned float_neg(unsigned uf) {
  *   Rating: 4
  */
 unsigned float_i2f(int x) {
-  return 2;
+	unsigned sign = 0;
+	unsigned abs = x;
+	unsigned exp = 158;
+	
+	if(x){
+		/*If x is negative, save sign bit and take absolute value.*/
+		if(x < 0)
+		{
+			sign = 0x80000000;
+			abs = -x;
+		}
+		while((abs & 0x80000000)== 0)
+		{
+			exp--;
+			abs = abs << 1;
+		}
+		
+		unsigned man = abs >> 8;
+		return sign | (exp << 23) | (man & 0x7fffff)
+	}
+	else
+		return x;
 }
 /* 
  * float_twice - Return bit-level equivalent of expression 2*f for
@@ -313,5 +387,26 @@ unsigned float_i2f(int x) {
  *   Rating: 4
  */
 unsigned float_twice(unsigned uf) {
-  return 2;
+	unsigned sign = uf & 0x80000000;
+	unsigned exp = (uf >> 23) & 0xff;
+	unsigned man = uf & 0x7fffff;
+	
+	/*Check if NaN*/
+    if (exp >= 0xff || exp == 0 && man == 0) { 
+        return uf;
+    } 
+	/*Normalized - increase exponent*/
+	else if (exp) {
+        exp++;
+    } 
+	/*edge - reduce fraction, increase exponent*/
+	else if (man == 0x7fffff) {
+		exp++;
+		man--;
+    } 
+	/*shift fraction one bit left*/
+	else {
+        man = man << 1;
+    }
+	return sign | (exp << 23) | (man);
 }
